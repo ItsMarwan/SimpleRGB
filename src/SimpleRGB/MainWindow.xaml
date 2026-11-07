@@ -1,0 +1,741 @@
+<Window x:Class="SimpleRGB.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SimpleRGB.ViewModels"
+        xmlns:c="clr-namespace:SimpleRGB.Controls"
+        Title="SimpleRGB" Width="1320" Height="820" MinWidth="1080" MinHeight="640"
+        Background="{StaticResource Bg}" WindowStartupLocation="CenterScreen"
+        Icon="/Assets/SimpleRGB.ico" UseLayoutRounding="True"
+        FontFamily="{StaticResource UiFont}">
+    <Window.Resources>
+        <vm:EnumEqualsConverter x:Key="EnumEq" />
+        <vm:StringEqualsToVisibilityConverter x:Key="TypeVis" />
+        <vm:InverseBoolToVisibilityConverter x:Key="InvVis" />
+        <vm:NotEmptyToVisibilityConverter x:Key="NotEmptyVis" />
+        <vm:HexToBrushConverter x:Key="HexBrush" />
+        <vm:InverseBoolConverter x:Key="InvBool" />
+        <vm:AllEqualConverter x:Key="AllEqual" />
+        <vm:MinConverter x:Key="Min48" />
+
+        <!-- Sidebar entry: icon, name, status, and a live mini LED strip -->
+        <DataTemplate x:Key="NavTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource Bg}" VerticalAlignment="Top">
+                    <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" HorizontalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="11,0,2,0">
+                    <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Subtitle}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" Margin="0,1,0,6" />
+                    <c:LedStrip Height="5" LedCount="{Binding PreviewLedCount}" LedSpacing="2"
+                                Snapshot="{Binding Snapshot}" ZoneId="{Binding PreviewZoneId}" Lighting="{Binding PreviewLighting}" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="CardBox" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Panel}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="20" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.Background>
+            <RadialGradientBrush Center="0.75,0" GradientOrigin="0.75,0" RadiusX="1" RadiusY="0.9">
+                <GradientStop Color="#151826" Offset="0" />
+                <GradientStop Color="#0E0F12" Offset="1" />
+            </RadialGradientBrush>
+        </Grid.Background>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="272" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="392" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ============================== Sidebar ============================== -->
+        <Border Background="#C0121317" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="14,18,14,14">
+                <Grid DockPanel.Dock="Top" Margin="6,0,0,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Image Source="/Assets/logo.png" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock Text="SimpleRGB" FontSize="19" FontWeight="Bold" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Command="{Binding RescanCommand}"
+                            ToolTip="Look for devices again" IsEnabled="{Binding IsScanning, Converter={StaticResource InvBool}}">
+                        <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="14" />
+                    </Button>
+                </Grid>
+
+                <StackPanel DockPanel.Dock="Bottom" Margin="2,10,2,0">
+                    <TextBlock Style="{StaticResource Caption}" Margin="4,0,0,10" Cursor="Help"
+                               Visibility="{Binding HasUnsupported, Converter={StaticResource BoolToVis}}">
+                        <Run Text="&#xE946;" FontFamily="{StaticResource IconFont}" FontSize="11" />
+                        <Run Text="{Binding Unsupported.Count, Mode=OneWay}" /><Run Text=" USB devices without an RGB plugin" />
+                        <TextBlock.ToolTip>
+                            <ItemsControl ItemsSource="{Binding Unsupported}" MaxWidth="320">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Foreground="{StaticResource SubText}">
+                                            <Run Text="•" /> <Run Text="{Binding Name, Mode=OneWay}" />
+                                            <Run Text="{Binding VendorId, Mode=OneWay, StringFormat=' ({0:X4}:'}" /><Run Text="{Binding ProductId, Mode=OneWay, StringFormat='{}{0:X4})'}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </TextBlock.ToolTip>
+                    </TextBlock>
+
+                    <Border Background="{StaticResource Card}" CornerRadius="12" Padding="14,10">
+                        <StackPanel>
+                            <Grid>
+                                <TextBlock Text="Master brightness" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding MasterBrightness, StringFormat={}{0}%}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Margin="0,6,0,0" Minimum="0" Maximum="100" Value="{Binding MasterBrightness}"
+                                    SmallChange="5" LargeChange="10" AutomationProperties.Name="Brightness" />
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Command="{Binding ToggleLightsCommand}" Padding="12,9">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE7E8;" Style="{StaticResource Icon}" FontSize="13" Foreground="{StaticResource Text}" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding LightsButtonText}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Margin="8,0,0,0" Padding="11,9" Command="{Binding OpenSettingsCommand}" ToolTip="Settings">
+                            <TextBlock Text="&#xE713;" Style="{StaticResource Icon}" FontSize="15" Foreground="{StaticResource Text}" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <ListBox ItemsSource="{Binding NavView}" SelectedItem="{Binding Selected}" ItemContainerStyle="{StaticResource NavItem}"
+                         ItemTemplate="{StaticResource NavTemplate}" AutomationProperties.Name="Devices">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock x:Name="Header" Style="{StaticResource SectionLabel}" Margin="10,16,0,4">
+                                        <Run Text="{Binding Name, Mode=OneWay}" />
+                                        <Run x:Name="Count" Text="{Binding ItemCount, Mode=OneWay, StringFormat='· {0}'}" Foreground="#4B4F58" />
+                                    </TextBlock>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Name}" Value="">
+                                            <Setter TargetName="Header" Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ItemCount}" Value="1">
+                                            <Setter TargetName="Count" Property="Text" Value="" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- ============================== Center ============================== -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="32,26,28,28">
+
+                <!-- Notices -->
+                <ItemsControl ItemsSource="{Binding Notices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource WarningSoft}" CornerRadius="12" Padding="16,12" Margin="0,0,0,14">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{StaticResource Warning}" Margin="0,0,12,0" VerticalAlignment="Top" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                        <WrapPanel Margin="0,8,0,0">
+                                            <Button Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Padding="12,5" Content="Restart as administrator"
+                                                    Command="{Binding DataContext.RestartAsAdminCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    Visibility="{Binding NeedsAdmin, Converter={StaticResource BoolToVis}}" />
+                                            <Button Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Padding="12,5"
+                                                    Content="{Binding CloseText}" CommandParameter="{Binding}"
+                                                    Command="{Binding DataContext.CloseAppCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    Visibility="{Binding CanClose, Converter={StaticResource BoolToVis}}" />
+                                            <Button Padding="12,5" CommandParameter="{Binding}" Content="Close + don't start with Windows"
+                                                    ToolTip="Also removes its start-with-Windows entry. You can undo this in Settings."
+                                                    Command="{Binding DataContext.CloseAppAndStartupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    Visibility="{Binding CanStopStartup, Converter={StaticResource BoolToVis}}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Header -->
+                <Grid Margin="0,0,0,22">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding SelectedDevice.IsRenaming, Converter={StaticResource InvVis}, FallbackValue=Visible}">
+                                <TextBlock Text="{Binding Selected.Name}" FontSize="30" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxWidth="520" />
+                                <Button Style="{StaticResource GhostButton}" Margin="8,6,0,0" Padding="6,4" VerticalAlignment="Center" ToolTip="Rename"
+                                        Command="{Binding BeginRenameCommand}" Visibility="{Binding IsDeviceSelected, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="14" />
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding SelectedDevice.IsRenaming, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                                <TextBox x:Name="RenameBox" Text="{Binding SelectedDevice.RenameText, UpdateSourceTrigger=PropertyChanged}" Width="340" FontSize="18"
+                                         MaxLength="60" KeyDown="RenameBox_KeyDown" IsVisibleChanged="RenameBox_IsVisibleChanged"
+                                         ToolTip="Leave empty to use the automatic name" />
+                                <Button Style="{StaticResource PrimaryButton}" Content="Save" Margin="8,0,0,0" Command="{Binding CommitRenameCommand}" />
+                                <Button Content="Cancel" Margin="8,0,0,0" Command="{Binding CancelRenameCommand}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource Caption}" FontSize="13" Margin="0,6,0,0"
+                                   Visibility="{Binding IsDeviceSelected, Converter={StaticResource BoolToVis}}">
+                            <Run Text="{Binding SelectedDevice.KindText, Mode=OneWay}" /> <Run Text="·" />
+                            <Run Text="{Binding SelectedDevice.ConnectionText, Mode=OneWay}" /> <Run Text="·" />
+                            <Run Text="{Binding SelectedDevice.Status, Mode=OneWay}" Foreground="{Binding SelectedDevice.StateBrush, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource Caption}" FontSize="13" Margin="0,6,0,0" Text="One look for every device, or let each device do its own thing."
+                                   Visibility="{Binding IsAllSelected, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,8,0,0">
+                        <TextBlock Style="{StaticResource Caption}" Foreground="{StaticResource Success}" HorizontalAlignment="Right"
+                                   Visibility="{Binding SavedText, Converter={StaticResource NotEmptyVis}}">
+                            <Run Text="&#xE73E;" FontFamily="{StaticResource IconFont}" /> <Run Text="{Binding SavedText, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock Text="{Binding ScanStatus}" Style="{StaticResource Caption}" HorizontalAlignment="Right"
+                                   Visibility="{Binding ScanStatus, Converter={StaticResource NotEmptyVis}}" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ===================== All devices ===================== -->
+                <StackPanel Visibility="{Binding IsAllSelected, Converter={StaticResource BoolToVis}}">
+                    <Border Style="{StaticResource CardBox}">
+                        <StackPanel>
+                            <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding SyncAll}">
+                                <StackPanel>
+                                    <TextBlock Text="Sync all devices" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,3,0,0"
+                                               Text="Every device that follows sync shows the lighting you set on the right. Turn a device's switch off below to give it its own look." />
+                                </StackPanel>
+                            </CheckBox>
+                            <c:LedStrip Height="14" Margin="0,18,0,0" LedCount="48" LedSpacing="3" Lighting="{Binding AllDevices.PreviewLighting}" />
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="YOUR DEVICES" Style="{StaticResource SectionLabel}" Margin="4,24,0,10" />
+                    <ItemsControl ItemsSource="{Binding DeviceList}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border x:Name="Card" Style="{StaticResource CardBox}" Margin="0,0,12,12" Padding="16,14">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource Bg}">
+                                                <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" HorizontalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="11,0,8,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock x:Name="SyncLabel" Text="{Binding SyncText}" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <CheckBox x:Name="SyncSwitch" Grid.Column="2" Style="{StaticResource Switch}" ToolTip="Follow sync"
+                                                      IsChecked="{Binding FollowsSync, Mode=OneWay}" CommandParameter="{Binding}"
+                                                      Command="{Binding DataContext.ToggleDeviceSyncCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                        </Grid>
+                                        <c:LedStrip Height="8" Margin="0,14,0,0" LedCount="24" LedSpacing="2"
+                                                    Snapshot="{Binding Snapshot}" ZoneId="{Binding PreviewZoneId}" />
+                                    </StackPanel>
+                                </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Glyph}" Value="&#xE772;">
+                                        <Setter TargetName="Card" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Style="{StaticResource CardBox}" Visibility="{Binding DeviceCount, Converter={StaticResource NotEmptyVis}, ConverterParameter=inv}">
+                        <StackPanel HorizontalAlignment="Center" Margin="0,16">
+                            <TextBlock Text="Looking for your RGB devices…" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                       Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}" />
+                            <StackPanel Visibility="{Binding IsScanning, Converter={StaticResource InvVis}}">
+                                <TextBlock Text="No RGB devices found" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                <Button Content="Look again" Command="{Binding RescanCommand}" HorizontalAlignment="Center" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ===================== One device ===================== -->
+                <StackPanel Visibility="{Binding IsDeviceSelected, Converter={StaticResource BoolToVis}}">
+                    <!-- Sync membership -->
+                    <Border Style="{StaticResource CardBox}" Padding="18,14" Margin="0,0,0,16">
+                        <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding SelectedFollowsSync}">
+                            <StackPanel>
+                                <TextBlock Text="Follow &quot;Sync all devices&quot;" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                           Text="Turn off to give this device its own lighting, even while everything else is synced." />
+                            </StackPanel>
+                        </CheckBox>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding SelectedDevice.Messages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource WarningSoft}" CornerRadius="12" Padding="14,10" Margin="0,0,0,12">
+                                    <TextBlock TextWrapping="Wrap"><Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" /> <Run Text="{Binding Text, Mode=OneWay}" /></TextBlock>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Background="#22F2545B" CornerRadius="12" Padding="14,10" Margin="0,0,0,12"
+                            Visibility="{Binding SelectedDevice.HasError, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                        <TextBlock TextWrapping="Wrap"><Run Text="{Binding SelectedDevice.Status, Mode=OneWay}" /><Run Text="  Use the refresh button to try again." Foreground="{StaticResource SubText}" /></TextBlock>
+                    </Border>
+
+                    <!-- Zones with live previews -->
+                    <Border Style="{StaticResource CardBox}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,4">
+                                <StackPanel>
+                                    <TextBlock Text="Zones" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0"
+                                               Text="Live preview. Click a zone to style it alone, Ctrl+click for several." />
+                                </StackPanel>
+                                <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Right" VerticalAlignment="Top" Padding="8,3"
+                                        Command="{Binding SelectAllZonesCommand}">
+                                    <TextBlock Text="Select all" Style="{StaticResource Caption}" Foreground="{StaticResource Accent}" />
+                                </Button>
+                            </Grid>
+                            <ListBox x:Name="ZoneList" ItemsSource="{Binding SelectedDevice.Zones}" SelectionMode="Extended" Margin="0,10,0,0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Disabled" SelectionChanged="ZoneList_SelectionChanged" AutomationProperties.Name="Zones">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource ZoneItem}">
+                                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.Template>
+                                    <ControlTemplate TargetType="ListBox">
+                                        <ItemsPresenter />
+                                    </ControlTemplate>
+                                </ListBox.Template>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="170" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <c:LedStrip Height="12" LedSpacing="2" ZoneId="{Binding Id}"
+                                                            LedCount="{Binding LedCount, Converter={StaticResource Min48}}"
+                                                            Snapshot="{Binding DataContext.SelectedDevice.Snapshot, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                                <TextBlock Text="{Binding LightingText}" Style="{StaticResource Caption}" Margin="0,6,0,0" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Style="{StaticResource Caption}" Text="This device hasn't reported any LEDs yet." Margin="0,6,0,0"
+                                       Visibility="{Binding SelectedDevice.HasZones, Converter={StaticResource InvVis}, FallbackValue=Collapsed}" />
+                            <Grid Margin="0,14,0,0">
+                                <TextBlock Text="Device brightness" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding DeviceBrightness, StringFormat={}{0}%}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Slider Margin="0,6,0,0" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10" Value="{Binding DeviceBrightness}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Device settings (e.g. LCD options) -->
+                    <Border Style="{StaticResource CardBox}" Margin="0,16,0,0"
+                            Visibility="{Binding SelectedDevice.HasParameters, Converter={StaticResource BoolToVis}, FallbackValue=Collapsed}">
+                        <StackPanel>
+                            <TextBlock Text="Device settings" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,6" />
+                            <ItemsControl ItemsSource="{Binding SelectedDevice.Parameters}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="230" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Description}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                           Visibility="{Binding Description, Converter={StaticResource NotEmptyVis}}" />
+                                            </StackPanel>
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding Value}" VerticalAlignment="Center"
+                                                      Visibility="{Binding Type, Converter={StaticResource TypeVis}, ConverterParameter=combobox}" />
+                                            <CheckBox Grid.Column="1" Style="{StaticResource Switch}" IsChecked="{Binding BoolValue}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                      Visibility="{Binding Type, Converter={StaticResource TypeVis}, ConverterParameter=boolean}" />
+                                            <Grid Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding Type, Converter={StaticResource TypeVis}, ConverterParameter=number}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="40" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Minimum="{Binding Min}" Maximum="{Binding Max}" Value="{Binding NumberValue}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Value}" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <Grid Grid.Column="1" VerticalAlignment="Center" Visibility="{Binding Type, Converter={StaticResource TypeVis}, ConverterParameter=color}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="26" Height="26" CornerRadius="13" Background="{Binding Value, Converter={StaticResource HexBrush}}" BorderBrush="{StaticResource Line}" BorderThickness="1" />
+                                                <TextBox Grid.Column="1" Margin="8,0,0,0" Text="{Binding Value, UpdateSourceTrigger=LostFocus}" />
+                                            </Grid>
+                                            <TextBox Grid.Column="1" Text="{Binding Value, UpdateSourceTrigger=LostFocus}" VerticalAlignment="Center"
+                                                     Visibility="{Binding Type, Converter={StaticResource TypeVis}, ConverterParameter=textfield}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource Caption}" Margin="4,16,0,0" TextWrapping="Wrap" Foreground="{StaticResource Muted}">
+                        <Run Text="Plugin:" /> <Run Text="{Binding SelectedDevice.PluginText, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ============================== Lighting editor ============================== -->
+        <Border Grid.Column="2" Background="#C0121317" BorderBrush="{StaticResource Line}" BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="22,24,22,24">
+                    <TextBlock Text="LIGHTING" Style="{StaticResource SectionLabel}" Margin="0,0,0,2" />
+                    <TextBlock Text="{Binding EditorTitle}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,16" />
+
+                    <!-- Following sync: explain instead of a dead editor -->
+                    <Border Background="{StaticResource AccentSoft}" CornerRadius="12" Padding="16,14" Margin="0,0,0,16"
+                            Visibility="{Binding ShowSyncBanner, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold" Text="This device follows Sync." />
+                            <TextBlock TextWrapping="Wrap" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                       Text="It shows the lighting from All devices. Give it its own look instead:" />
+                            <Button Style="{StaticResource PrimaryButton}" Content="Style this device separately" HorizontalAlignment="Left" Margin="0,10,0,0" Padding="12,6"
+                                    Click="StyleSeparately_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel IsEnabled="{Binding EditorEnabled}">
+                        <!-- Effects with live previews -->
+                        <ItemsControl ItemsSource="{Binding EffectOptions}" Margin="-3,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="3" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <RadioButton Style="{StaticResource EffectTile}" Tag="{Binding Mode}" GroupName="Mode" Click="Mode_Click">
+                                        <RadioButton.IsChecked>
+                                            <MultiBinding Converter="{StaticResource AllEqual}" Mode="OneWay">
+                                                <Binding Path="DataContext.EditorMode" RelativeSource="{RelativeSource AncestorType=Window}" />
+                                                <Binding Path="Mode" />
+                                            </MultiBinding>
+                                        </RadioButton.IsChecked>
+                                        <StackPanel Width="96">
+                                            <c:LedStrip Height="7" LedCount="10" LedSpacing="2" Lighting="{Binding Preview}" Margin="4,2,4,8" />
+                                            <TextBlock Text="{Binding Label}" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Color 1 / Color 2 -->
+                        <UniformGrid Rows="1" Margin="0,16,0,0" Visibility="{Binding ShowSecondColor, Converter={StaticResource BoolToVis}}">
+                            <RadioButton Style="{StaticResource SlotTile}" Tag="slot:0" Click="Option_Click" GroupName="Slot"
+                                         IsChecked="{Binding IsSlot1, Mode=OneWay}" Margin="0,0,4,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="18" Height="18" CornerRadius="9" Background="{Binding Color1Brush}" BorderBrush="#40FFFFFF" BorderThickness="1" />
+                                    <TextBlock Text="Color 1" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource SlotTile}" Tag="slot:1" Click="Option_Click" GroupName="Slot"
+                                         IsChecked="{Binding IsSlot2, Mode=OneWay}" Margin="4,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="18" Height="18" CornerRadius="9" Background="{Binding Color2Brush}" BorderBrush="#40FFFFFF" BorderThickness="1" />
+                                    <TextBlock Text="{Binding SecondColorLabel}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                        </UniformGrid>
+
+                        <c:ColorPicker Margin="0,16,0,0" SelectedColor="{Binding PickerColor}"
+                                       Favorites="{Binding FavoriteColors}" Recents="{Binding RecentColors}"
+                                       AddFavoriteCommand="{Binding AddFavoriteCommand}" RemoveFavoriteCommand="{Binding RemoveFavoriteCommand}"
+                                       Visibility="{Binding ShowColor, Converter={StaticResource BoolToVis}}" />
+
+                        <!-- Effect options -->
+                        <Border Background="{StaticResource Card}" CornerRadius="12" Padding="16,12" Margin="0,18,0,0"
+                                Visibility="{Binding ShowEffectOptions, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <StackPanel Visibility="{Binding ShowSpeed, Converter={StaticResource BoolToVis}}" Margin="0,0,0,10">
+                                    <Grid>
+                                        <TextBlock Text="Speed" Style="{StaticResource Caption}" />
+                                        <TextBlock Text="{Binding EditorSpeed}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <Slider Margin="0,6,0,0" Minimum="1" Maximum="100" Value="{Binding EditorSpeed}" SmallChange="5" LargeChange="10" />
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ShowSize, Converter={StaticResource BoolToVis}}" Margin="0,0,0,10">
+                                    <Grid>
+                                        <TextBlock Text="{Binding SizeLabel}" Style="{StaticResource Caption}" />
+                                        <TextBlock Text="{Binding EditorSize}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <Slider Margin="0,6,0,0" Minimum="1" Maximum="100" Value="{Binding EditorSize}" SmallChange="5" LargeChange="10" />
+                                </StackPanel>
+                                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding EditorReverse}" Margin="0,2,0,2"
+                                          Visibility="{Binding ShowDirection, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="Reverse direction" Style="{StaticResource Caption}" Foreground="{StaticResource Text}" />
+                                </CheckBox>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Margin="0,18,0,0" Visibility="{Binding ShowChannelLeds, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <TextBlock Text="LEDs on this header" Style="{StaticResource Caption}" />
+                                <TextBlock Style="{StaticResource Caption}" HorizontalAlignment="Right">
+                                    <Run Text="{Binding ChannelLedCount, Mode=OneWay}" /><Run Text=" / " /><Run Text="{Binding ChannelLedLimit, Mode=OneWay}" />
+                                </TextBlock>
+                            </Grid>
+                            <Slider Margin="0,6,0,0" Minimum="0" Maximum="{Binding ChannelLedLimit}" Value="{Binding ChannelLedCount}"
+                                    IsSnapToTickEnabled="True" TickFrequency="1" SmallChange="1" LargeChange="10" />
+                        </StackPanel>
+
+                                    <!-- Music -->
+                                    <StackPanel Margin="0,18,0,0" Visibility="{Binding ShowMusic, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="LISTEN TO" Style="{StaticResource SectionLabel}" />
+                                        <Border Background="{StaticResource Bg}" CornerRadius="9" Padding="2">
+                                            <UniformGrid Rows="1">
+                                                <RadioButton Style="{StaticResource Segment}" Content="Spotify" GroupName="Source" Tag="source:Spotify" Click="Option_Click"
+                                                             IsChecked="{Binding AudioSource, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Spotify}" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="All PC audio" GroupName="Source" Tag="source:AllAudio" Click="Option_Click"
+                                                             IsChecked="{Binding AudioSource, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=AllAudio}" />
+                                            </UniformGrid>
+                                        </Border>
+
+                                        <Border Background="{StaticResource Bg}" CornerRadius="9" Padding="12,10" Margin="0,8,0,0">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding NowPlayingText}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,0,0,2"
+                                                           Visibility="{Binding NowPlayingText, Converter={StaticResource NotEmptyVis}}" />
+                                                <Grid>
+                                                    <TextBlock Text="{Binding AudioStatus}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" Margin="0,0,18,0" />
+                                                    <Ellipse Width="10" Height="10" HorizontalAlignment="Right" Fill="{StaticResource Accent}"
+                                                             Opacity="{Binding BeatPulse}" ToolTip="Flashes on every beat" />
+                                                </Grid>
+                                                <Grid Margin="0,10,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="54" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="16" />
+                                                        <RowDefinition Height="16" />
+                                                        <RowDefinition Height="16" />
+                                                    </Grid.RowDefinitions>
+                                                    <TextBlock Text="Bass" Style="{StaticResource Caption}" FontSize="11" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Column="1" Style="{StaticResource Meter}" Value="{Binding MeterBass, Mode=OneWay}" />
+                                                    <TextBlock Grid.Row="1" Text="Vocals" Style="{StaticResource Caption}" FontSize="11" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Row="1" Grid.Column="1" Style="{StaticResource Meter}" Value="{Binding MeterMid, Mode=OneWay}" />
+                                                    <TextBlock Grid.Row="2" Text="Treble" Style="{StaticResource Caption}" FontSize="11" VerticalAlignment="Center" />
+                                                    <ProgressBar Grid.Row="2" Grid.Column="1" Style="{StaticResource Meter}" Value="{Binding MeterTreble, Mode=OneWay}" />
+                                                </Grid>
+                                                <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                                                            Visibility="{Binding AlbumColors.Count, Converter={StaticResource NotEmptyVis}}">
+                                                    <TextBlock Text="Album colors" Style="{StaticResource Caption}" FontSize="11" VerticalAlignment="Center" Width="76" />
+                                                    <ItemsControl ItemsSource="{Binding AlbumColors}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <StackPanel Orientation="Horizontal" />
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Width="20" Height="14" CornerRadius="4" Background="{Binding}" Margin="0,0,5,0" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock Text="REACT TO" Style="{StaticResource SectionLabel}" Margin="0,16,0,8" />
+                                        <Border Background="{StaticResource Bg}" CornerRadius="9" Padding="2">
+                                            <UniformGrid Rows="1">
+                                                <RadioButton Style="{StaticResource Segment}" Content="Beat" GroupName="React" Tag="react:Beat" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicReact, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Beat}"
+                                                             ToolTip="Flashes on every kick drum" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="Bass" GroupName="React" Tag="react:Bass" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicReact, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Bass}"
+                                                             ToolTip="Follows the low end smoothly" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="Vocals" GroupName="React" Tag="react:Vocals" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicReact, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Vocals}"
+                                                             ToolTip="Mid frequencies: voices, guitars, synths" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="Treble" GroupName="React" Tag="react:Treble" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicReact, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Treble}"
+                                                             ToolTip="Hi-hats, cymbals and sparkle" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="All" GroupName="React" Tag="react:Everything" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicReact, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Everything}"
+                                                             ToolTip="Overall loudness" />
+                                            </UniformGrid>
+                                        </Border>
+
+                                        <TextBlock Text="COLORS" Style="{StaticResource SectionLabel}" Margin="0,16,0,8" />
+                                        <ComboBox ItemsSource="{x:Static vm:MainViewModel.MusicColorOptions}" SelectedIndex="{Binding EditorMusicColorsIndex}" />
+
+                                        <TextBlock Text="STYLE" Style="{StaticResource SectionLabel}" Margin="0,16,0,8" />
+                                        <Border Background="{StaticResource Bg}" CornerRadius="9" Padding="2">
+                                            <UniformGrid Rows="1">
+                                                <RadioButton Style="{StaticResource Segment}" Content="Pulse" GroupName="Style" Tag="style:Pulse" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicStyle, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Pulse}"
+                                                             ToolTip="The whole zone pulses with the music" />
+                                                <RadioButton Style="{StaticResource Segment}" Content="Equalizer" GroupName="Style" Tag="style:Equalizer" Click="Option_Click"
+                                                             IsChecked="{Binding EditorMusicStyle, Mode=OneWay, Converter={StaticResource EnumEq}, ConverterParameter=Equalizer}"
+                                                             ToolTip="LED strips fill up like a level meter" />
+                                            </UniformGrid>
+                                        </Border>
+
+                                        <Grid Margin="0,16,0,0">
+                                            <TextBlock Text="Sensitivity" Style="{StaticResource Caption}" />
+                                            <TextBlock Text="{Binding EditorSpeed}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                        </Grid>
+                                        <Slider Margin="0,6,0,0" Minimum="1" Maximum="100" Value="{Binding EditorSpeed}" SmallChange="5" LargeChange="10" />
+                                    </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+            <!-- ============================== Settings overlay ============================== -->
+            <Grid Grid.ColumnSpan="3" Background="#C0000000" Visibility="{Binding SettingsOpen, Converter={StaticResource BoolToVis}}"
+                  MouseLeftButtonDown="Overlay_MouseDown">
+                <Border Style="{StaticResource CardBorder}" Background="{StaticResource Panel}" Width="580" Margin="0,40"
+                        VerticalAlignment="Center" Padding="0" MouseLeftButtonDown="SettingsCard_MouseDown">
+                    <DockPanel>
+                        <Grid DockPanel.Dock="Top" Margin="24,20,16,8">
+                            <TextBlock Text="Settings" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <Button Style="{StaticResource GhostButton}" HorizontalAlignment="Right" Command="{Binding CloseSettingsCommand}" ToolTip="Close">
+                                <TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="13" />
+                            </Button>
+                        </Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="560">
+                            <StackPanel Margin="24,4,24,22">
+                                <TextBlock Text="GENERAL" Style="{StaticResource SectionLabel}" Margin="0,8,0,10" />
+                                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding StartWithWindows}" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="Start with Windows" />
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Restores your lighting when you sign in. Windows asks for permission once." />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding StartMinimized}" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="Start hidden in the tray" />
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Text="When starting with Windows, don't open the window." />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CloseToTray}" Margin="0,0,0,14">
+                                    <StackPanel>
+                                        <TextBlock Text="Keep running when the window is closed" />
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Some devices need SimpleRGB running to keep their colors. Find it in the tray." />
+                                    </StackPanel>
+                                </CheckBox>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="190" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="When SimpleRGB exits" />
+                                        <TextBlock Style="{StaticResource Caption}" Text="What your lights do after you quit." />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" SelectedIndex="{Binding ExitBehaviorIndex}">
+                                        <ComboBoxItem Content="Keep current colors" />
+                                        <ComboBoxItem Content="Turn lights off" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <TextBlock Text="RAM AND GRAPHICS CARD" Style="{StaticResource SectionLabel}" Margin="0,22,0,10" />
+                                <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding EnableSmBus}" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="Control RAM and GPU lighting" />
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                                   Text="Talks to memory and graphics-card RGB chips. The chips that hold your RAM's settings (SPD/EEPROM) are hard-locked and can never be written." />
+                                    </StackPanel>
+                                </CheckBox>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding PawnIoStatus}" Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Get PawnIO" Command="{Binding GetPawnIoCommand}" Margin="10,0,0,0" Padding="12,5"
+                                            Visibility="{Binding PawnIoMissing, Converter={StaticResource BoolToVis}}" />
+                                </Grid>
+
+                                <TextBlock Text="PLUGINS" Style="{StaticResource SectionLabel}" Margin="0,22,0,10" />
+                                <TextBlock Text="{Binding PluginSummary}" />
+                                <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,10"
+                                           Text="SimpleRGB uses SignalRGB's device plugins: copied from SignalRGB if it's installed, or downloaded from SignalRGB's public GitLab. Your own plugins go in the Custom folder and take priority." />
+                                <WrapPanel>
+                                    <Button Content="Update from SignalRGB" Command="{Binding ImportPluginsCommand}" Margin="0,0,8,8" />
+                                    <Button Content="Download from GitLab" Command="{Binding DownloadPluginsCommand}" Margin="0,0,8,8" />
+                                    <Button Content="Open plugin folder" Command="{Binding OpenPluginFolderCommand}" Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <TextBlock Text="{Binding PluginStatus}" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                           Visibility="{Binding PluginStatus, Converter={StaticResource NotEmptyVis}}" />
+
+                                <StackPanel Visibility="{Binding HasDisabledStartupEntries, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="OTHER PROGRAMS" Style="{StaticResource SectionLabel}" Margin="0,22,0,10" />
+                                    <Grid>
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"
+                                                   Text="You stopped some programs (like TRCC) from starting with Windows. Put them back if you want them again." />
+                                        <Button Grid.Column="1" HorizontalAlignment="Right" Content="Let them start again" Padding="12,5" Command="{Binding RestoreStartupCommand}" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding StartupRestoreText}" Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                               Visibility="{Binding StartupRestoreText, Converter={StaticResource NotEmptyVis}}" />
+                                </StackPanel>
+
+                                <TextBlock Text="ABOUT" Style="{StaticResource SectionLabel}" Margin="0,22,0,10" />
+                                <Grid>
+                                    <TextBlock Text="{Binding VersionText}" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                                    <Button Content="Open log folder" Command="{Binding OpenLogCommand}" HorizontalAlignment="Right" Padding="12,5" />
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Grid>
+    </Grid>
+</Window>

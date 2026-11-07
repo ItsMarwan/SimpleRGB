@@ -1,0 +1,28 @@
+name: Device request
+description: Ask for support for a device SimpleRGB doesn't control yet
+labels: [device-request]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Device (brand and model)
+      placeholder: e.g. Redragon K708 RGB Pro
+    validations:
+      required: true
+  - type: input
+    id: ids
+    attributes:
+      label: USB ID (VID:PID)
+      description: Shown in SimpleRGB (hover "USB devices without an RGB plugin"), or run `SimpleRGB.Probe list`.
+      placeholder: e.g. 320F:511B
+  - type: input
+    id: software
+    attributes:
+      label: Manufacturer's software
+      placeholder: e.g. "Redragon K708-RGB-PRO" app, version 1.2
+  - type: textarea
+    id: probe
+    attributes:
+      label: Probe output (optional, read-only)
+      description: Output of `SimpleRGB.Probe list` for this device (endpoints, usage pages, report sizes).
+      render: text

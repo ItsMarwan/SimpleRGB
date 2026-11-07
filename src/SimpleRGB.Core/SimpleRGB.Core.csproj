@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>SimpleRGB.Core</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jint" Version="4.17.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SimpleRGB.Tests" />
+    <InternalsVisibleTo Include="SimpleRGB.Probe" />
+  </ItemGroup>
+
+  <!-- Signed PawnIO SMBus modules (LGPL-2.1, https://github.com/namazso/PawnIO.Modules). -->
+  <ItemGroup>
+    <None Include="Assets\PawnIO\*.*" Link="PawnIO\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\Plugins\**\*.js" Link="Plugins\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

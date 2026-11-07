@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test
+        run: dotnet test tests/SimpleRGB.Tests -c Release
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}"
+          dotnet publish src/SimpleRGB -c Release -r win-x64 --self-contained false -o out/fd -p:DebugType=none
+          dotnet publish src/SimpleRGB -c Release -r win-x64 --self-contained true  -o out/sc -p:DebugType=none
+          foreach ($d in 'out/fd','out/sc') { Copy-Item LICENSE, README.md $d }
+          Compress-Archive -Path out/fd/* -DestinationPath "SimpleRGB-$v-win-x64.zip"
+          Compress-Archive -Path out/sc/* -DestinationPath "SimpleRGB-$v-win-x64-self-contained.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SimpleRGB ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            SimpleRGB-${{ github.ref_name }}-win-x64.zip
+            SimpleRGB-${{ github.ref_name }}-win-x64-self-contained.zip

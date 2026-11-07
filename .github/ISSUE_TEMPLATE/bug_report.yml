@@ -1,0 +1,33 @@
+name: Bug report
+description: Something doesn't work right
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: devices
+    attributes:
+      label: Affected device(s)
+      placeholder: e.g. ASUS TUF B760M-PLUS (Aura), Gigabyte RTX 4070 Ti, Thermalright PA120 Digital
+  - type: input
+    id: version
+    attributes:
+      label: SimpleRGB version and Windows version
+      placeholder: e.g. 1.0.0 on Windows 11 24H2
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Attach or paste `%APPDATA%\SimpleRGB\logs\simplergb.log` (Settings → Open log folder).
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: No other RGB app (SignalRGB, Armoury Crate, iCUE, TRCC…) was running
